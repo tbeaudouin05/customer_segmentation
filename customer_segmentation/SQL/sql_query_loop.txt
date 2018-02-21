@@ -1,0 +1,125 @@
+SELECT
+   il.customer_id
+  ,GETDATE() AS 'last_refresh_date'
+  ,MAX(il.created_at) AS  'last_order_date'
+  ,MIN(il.created_at) AS  'first_order_date'
+  ,COUNT(DISTINCT il.order_nr) AS 'order_count'
+  ,COUNT(DISTINCT CASE WHEN il.is_marketing_coupon=1 AND il.coupon_money_value > 0 OR il.cart_rule_discount > 0 THEN il.order_nr ELSE NULL END) AS 'discount_order_count'
+  ,COUNT(ALL il.canceled_at) AS 'cancel_item_count'
+  ,COUNT(ALL il.returned_at) AS 'return_item_count'
+  ,SUM(il.nmv) AS 'nmv'
+  ,COUNT(ALL il.id_sales_order_item) AS 'item_count'
+  ,SUM (il.is_bad_return_reason) AS 'bad_return_reason_count'
+  ,SUM (il.is_bad_cancel_reason) AS 'bad_cancel_reason_count'
+  ,SUM (il.is_refund_reject) AS 'refund_reject_count'
+  ,COUNT(CASE WHEN il.department ='Electronics & Accessories' THEN il.id_sales_order_item END) AS 'item_count_electronic_accessories'
+  ,COUNT(CASE WHEN il.department ='Mobile & Tablet' THEN il.id_sales_order_item END) AS 'item_count_mobile_tablet'
+  ,COUNT(CASE WHEN il.department ='Home & Living' THEN il.id_sales_order_item END) AS 'item_count_home_living'
+  ,COUNT(CASE WHEN il.department ='Fashion' THEN il.id_sales_order_item END) AS 'item_count_fashion'
+  ,COUNT(CASE WHEN il.department ='Health & Beauty' THEN il.id_sales_order_item END) AS 'item_count_health_beauty'
+  ,COUNT(CASE WHEN il.department ='Other GM' THEN il.id_sales_order_item END) AS 'item_count_other_gm'
+  ,COUNT(CASE WHEN il.department ='FMCG' THEN il.id_sales_order_item END) AS 'item_count_fmcg'
+  ,COUNT(CASE WHEN il.location ='Tehran' THEN il.id_sales_order_item END) AS 'item_count_tehran'
+  ,COUNT(CASE WHEN il.location ='Shahrestan' THEN il.id_sales_order_item END) AS 'item_count_shahrestan'
+  ,COUNT(CASE WHEN il.customer_gender ='female' THEN il.id_sales_order_item END) AS 'item_count_female'
+  ,COUNT(CASE WHEN il.customer_gender ='male' THEN il.id_sales_order_item END) AS 'item_count_male'
+  ,COUNT(CASE WHEN il.customer_age <20 THEN il.id_sales_order_item END) AS 'item_count_20'
+  ,COUNT(CASE WHEN il.customer_age >=20 AND il.customer_age <35 THEN il.id_sales_order_item END) AS 'item_count_20_35'
+  ,COUNT(CASE WHEN il.customer_age >=35 AND il.customer_age <50 THEN il.id_sales_order_item END) AS 'item_count_35_50'
+  ,COUNT(CASE WHEN il.customer_age >50 THEN il.id_sales_order_item END) AS 'item_count_50'
+  
+
+  FROM
+
+(SELECT 
+
+   si.id_sales_order_item
+  ,si.created_at
+  ,so.customer_id
+  ,so.customer_region
+  ,si.unit_price AS 'nmv'
+  ,so.customer_birthday
+  ,so.customer_gender
+  ,so.order_nr
+  ,si.coupon_money_value
+  ,si.cart_rule_discount
+  ,si.canceled_at
+  ,si.returned_at
+  ,si.shipped_at
+
+
+  ,CASE  WHEN CAST(SUBSTRING(so.customer_birthday,1,4) AS DECIMAL(18,2))> 2017 OR CAST(SUBSTRING(so.customer_birthday,1,4) AS DECIMAL(18,2))< 1200 THEN NULL
+         WHEN 2017- CAST(SUBSTRING(so.customer_birthday,1,4) AS DECIMAL(18,2)) > 200 THEN 1396- CAST(SUBSTRING(so.customer_birthday,1,4) AS DECIMAL(18,2))
+         ELSE 2017- CAST(SUBSTRING(so.customer_birthday,1,4) AS DECIMAL(18,2)) END AS customer_age
+
+  ,CASE WHEN ci.id_customer_address_city IN(205, 107) THEN 'Tehran' ELSE 'Shahrestan' END AS 'location'
+
+  ,CASE 
+  WHEN cc.department IN ('Electronics & Accessories')  THEN 'Electronics & Accessories'
+  WHEN cc.department IN ('Mobile & Tablet')  THEN 'Mobile & Tablet'
+  WHEN cc.department IN ('Home & Living', 'Home Appliances')  THEN 'Home & Living'
+  WHEN cc.department IN ('Fashion')  THEN 'Fashion'
+  WHEN cc.department IN ('Health & Beauty')  THEN 'Health & Beauty'
+  WHEN cc.department IN ('Other GM')  THEN 'Other GM'
+  WHEN cc.department IN ('Super Market')  THEN 'FMCG' END as 'department'
+
+  ,CASE WHEN si.refund_reject_at IS NOT NULL then  1 ELSE 0 END AS 'is_refund_reject'
+
+ ,CASE 
+  WHEN so.coupon_code LIKE '%sv\_%' THEN 0
+  WHEN so.coupon_code LIKE '%sc\_%' THEN 0
+  WHEN so.coupon_code LIKE '%rep%'  THEN 0 
+  WHEN so.coupon_code LIKE '%gift%' THEN 0
+  WHEN so.coupon_code LIKE '%apology%'  THEN 0
+  ELSE  1 END as 'is_marketing_coupon'
+
+  ,CASE WHEN si.return_reason ='content issue' THEN 1
+        WHEN si.return_reason ='Damaged item' THEN 1
+        WHEN si.return_reason ='Expiring date' THEN 1
+        WHEN si.return_reason ='Fake A' THEN 1
+        WHEN si.return_reason ='Fake C' THEN 1
+        WHEN si.return_reason ='Fake Product' THEN 1
+        WHEN si.return_reason ='Guarantee issue / wrong details base on our site' THEN 1
+        WHEN si.return_reason ='Internal - wrong item' THEN 1
+        WHEN si.return_reason ='Lost in Shipment' THEN 1
+        WHEN si.return_reason ='Merchant - Defective' THEN 1
+        WHEN si.return_reason ='merchant - wrong item' THEN 1
+        WHEN si.return_reason ='Merchant-Not complete product' THEN 1
+        WHEN si.return_reason ='Poor quality of the product' THEN 1
+        WHEN si.return_reason ='wrong color' THEN 1
+        WHEN si.return_reason ='Wrong product information' THEN 1
+        ELSE 0 END AS 'is_bad_return_reason'
+
+  ,CASE WHEN si.cancel_reason ='cancellation - unable to send via 3PL/own-rider' THEN 1
+        WHEN si.cancel_reason ='Customer - Late fulfillment' THEN 1
+        WHEN si.cancel_reason ='Customer - Some items were out of stock' THEN 1
+        WHEN si.cancel_reason ='Customer - Wrong product information' THEN 1
+        WHEN si.cancel_reason ='Internal-Defective' THEN 1
+        WHEN si.cancel_reason ='Internal-Error' THEN 1
+        WHEN si.cancel_reason ='Late Fulfilment by Seller' THEN 1
+        WHEN si.cancel_reason ='Lost in Warehouse' THEN 1
+        WHEN si.cancel_reason ='Merchant - Defective' THEN 1
+        WHEN si.cancel_reason ='Merchant - Order replacement' THEN 1
+        WHEN si.cancel_reason ='Merchant - Out of stock' THEN 1
+        WHEN si.cancel_reason ='Merchant - Price was wrong (Bamilo mistake)' THEN 1
+        WHEN si.cancel_reason ='Merchant - Price was wrong (Merchant mistake)' THEN 1
+        WHEN si.cancel_reason ='Merchant-Late Fulfilment' THEN 1
+        WHEN si.cancel_reason ='Merchant-Wrong' THEN 1
+        WHEN si.cancel_reason ='Out of stock(Cancellation - Internal)' THEN 1
+        WHEN si.cancel_reason ='Price Was wrong-Merchant' THEN 1
+        WHEN si.cancel_reason ='SC/Bob Error' THEN 1
+        ELSE 0 END AS 'is_bad_cancel_reason'
+
+  FROM StagingDB.Gathering.tblSalesOrder so
+
+  LEFT JOIN StagingDB.Gathering.tblSalesItem si
+  ON        so.id_sales_order = si.fk_sales_order
+
+  LEFT JOIN StagingDB.Gathering.tblSimpleCatalog sc
+  ON sc.sku = si.sku
+
+  LEFT JOIN StagingDB.Gathering.tblConfigCatalog cc
+  ON cc.id_catalog_config = sc.fk_catalog_config
+
+  LEFT JOIN city_id ci
+  ON ci.name = so.customer_city
